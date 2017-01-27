@@ -1,0 +1,12 @@
+---
+title: "Readme-file"
+author: "Markus Selin"
+date: "27 tammikuuta 2017"
+output: html_document
+---
+
+# Reame-file for chapter1
+
+I should write something about the course. Well, downloading all the programs and creating accounts has taken quite a while. I really hope we get to do some nead datawrangling soon enough. And by the way, DataCamp-exercises are cool!
+
+Here is a [link](https://msathy.github.io/IODS-project/) to my course diary.

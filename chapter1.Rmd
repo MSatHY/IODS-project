@@ -2,3 +2,11 @@
 # About the project
 
 *Write a short description about the course and add a link to your github repository here. This is an R markdown (.Rmd) file so you can use R markdown syntax. See the 'Useful links' page in the mooc area (chapter 1) for instructions.*
+
+Open data science is a massive open online course (MOOC) revolving around three major themes:
+
+1. Open Data
+2. Data Science
+3. Open Science 
+
+Each week the students will finish two course exercises and give feedback to a fellow student. The course utilizes R-language which will be learned in the weekly exercises done at https://www.datacamp.com/. The data wrangling exercises will be collected to a course diary and published online at https://github.com/. Here is a [link](https://github.com/MSatHY/IODS-project) to my Github repository.
