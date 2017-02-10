@@ -1,0 +1,133 @@
+---
+title: "Logistic regression excercise"
+author: "Markus Selin"
+date: "10 helmikuuta 2017"
+output: html_document
+---
+
+```{r setup, include=F}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+alc <- read.csv("http://s3.amazonaws.com/assets.datacamp.com/production/course_2218/datasets/alc.txt", sep = ",", header = T)
+```
+
+# Logistic regression excercise
+
+The data in this chapter is combined from two data-sets in a freely available [zip file](https://archive.ics.uci.edu/ml/machine-learning-databases/00356/). The datafiles contain students' family background and free time activity information as well as first, second and final grades in mathematics and portugese. List of the variable names will be available under this chapter. More information on the contents of the file can be found [here](https://archive.ics.uci.edu/ml/datasets/STUDENT+ALCOHOL+CONSUMPTION). Variables "school", "sex", "age", "address", "famsize", "Pstatus", "Medu", "Fedu", "Mjob", "Fjob", "reason", "nursery","internet" were used as identifiers for joining the data. Only the observations present in both datasets were accepted. The variables not used for joining the two data have been combined by averaging. Average of weekday and weekend alcohol consuption was produced into variable "alc_use", and logical variable "high_use" is true for students with higher than 2 value in the "alc_use".
+
+```{r}
+colnames(alc)
+```
+
+Age ("age") is definitely interesting variable concerning alchohol consumption. I imagine that very young students are less likely to consume high amounts of alcohol than older students. Sex of the student ("sex") might show cultural influence. I imagine male students are more likely to consume high amounts of alcohol. I also assume that mother's job ("Mjob") or father's job ("Fjob") in health care related sector will reduce changes for high alcohol consumption. I will now make a analysis data set containing these variables and the logical variable for high alcohol use ("high_use") and explore the disributions of the chosen variables.
+
+```{r}
+# Selecting the variables
+analysis_variables <- c("age","sex","Mjob","Fjob","high_use")
+analysis <- select(alc, one_of(analysis_variables))
+
+# Summary
+summary(analysis)
+```
+
+```{r}
+# Graphical disributions of the non-logical variables
+p1a <- ggplot(analysis, aes(x = age, col = sex))
+p1 <- p1a + geom_histogram(binwidth=1)
+p2a <- ggplot(analysis, aes(x = Mjob, col = sex))
+p2 <- p2a + geom_bar()
+p3a <- ggplot(analysis, aes(x = Fjob, col = sex))
+p3 <- p3a + geom_bar()
+p1 # printout
+p2 # printout
+p3 # printout
+```
+
+Over one third of the students (112 out of 270) are using high amounts of alcohol. There is almost equal amounts of female and male students represented in the data (good!). There are mostly around 100 students per age group from 15 to 18, and only less than 15 students above the age of 18. Parents working in a healthcare related sector are rare (33 mothers and 17 fathers). I will exlore the relationships of the chosen variables with alcohol consumption using box plot and cross-tabulation methods.
+
+
+```{r}
+
+g1 <- ggplot(analysis, aes(x = high_use, y = age))
+g1 + geom_boxplot() + ylab("Age")
+
+```
+
+
+```{r}
+table(Age = analysis$age, high_use = analysis$high_use) %>% addmargins()
+table(Sex = analysis$sex, high_use = analysis$high_use) %>% addmargins()
+table(MotherJob = analysis$Mjob, high_use = analysis$high_use) %>% addmargins()
+table(FatherJob = analysis$Fjob, high_use = analysis$high_use) %>% addmargins()
+```
+
+The boxplot shows slighly higher ages for the high alcohol consuming students, but the range of ages is maybe too narrow to notice a clear difference (I was expecting larger distribution of ages, and younger students might show this trend better). As expected, the male students use high amounts of alcohol almost twice as often as female students. According to the assumption, The students might use less alcohol if their fathers work in healtcare or teaching sector, or are home compared to students whose fathers work in servises or other sectors. Unexpectedly, the mother's job does not show similar trend. Instead, the children of mothers who stay at home might have slight tendency to consume more alcohol than other students. Let us make a logistic regression model out of the findings here. The variables describing parents' work will be mutated to logical variables Mhome (mother at home) and Func (father has a uncommon work status among fathers) to allow meaningful use of the logistic regression model.
+
+```{r}
+# Mutations of the data
+analysis <- mutate(analysis, Func = (Fjob=="at_home"|Fjob=="health"|Fjob=="teacher") )
+analysis <- mutate(analysis, Mhome = (Mjob=="at_home") )
+str(analysis)
+```
+
+```{r}
+# Modelling
+model <- glm(high_use ~ age + sex + Mhome + Func, data = analysis, family = "binomial")
+summary(model)
+```
+
+```{r}
+# store coefficients of the model (CO)
+CO <- coef(model)
+
+# compute odds ratios (OR)
+OR <- coef(model) %>% exp
+
+# compute confidence intervals (CI)
+CI <- confint(model) %>% exp
+
+# print out the odds ratios with their confidence intervals (and coefficients)
+cbind(CO, OR, CI)
+```
+
+The residuals are not nicely centered around the median. Instead we see a close packing of the lower values and larger range in the higher values.  This can be seen in the very low odds ratio of the intercept. The mothers may stay home at ease; the dummy variable "Mhome" is not meaningful for explanatory variable for the model. The male sex is the best explanatory variable for high alcohol consumption, although it has a high standard error (the confidence interwall does not cross 1:1 odds ratio for low/high consumption). Age and uncommon working status of the father have some potential to explain the alcohol consumption (they cross the 1:1 ratio, although barely). Age increases the likelihood of high consumption by changing the increasing the odds ratio 0.18 units/year and uncommon working status of the father degreases the likelihood of high consumption by reducing the odds ratio 0.64 (if true). The interpretation (if both factors would be meaningfull for the model) is that if Func is true, then the student has similar tendency to consume high amounts of alcohol than a student three years younger than him/herself.
+
+Let us test the predictive power of the model.
+
+```{r}
+probabilities <- predict(model, type = "response")
+analysis <- mutate(analysis, probability = probabilities)
+analysis <- mutate(analysis, prediction = probabilities>0.5)
+table(high_use = analysis$high_use, prediction = analysis$prediction)
+```
+
+```{r}
+# initialize a plot of 'high_use' versus 'probability' in 'analysis'
+g <- ggplot(analysis, aes(x = probability, y = high_use, col = prediction))
+
+# define the geom as points and draw the plot
+g + geom_point()
+```
+
+The model seems to be grossly biased into estimating students as low users of alcohol. Let us compute the total proportion of students inaccurately classified by model.
+
+```{r}
+# define a loss function (mean prediction error)
+loss_func <- function(class, prob) {
+  n_wrong <- abs(class - prob) > 0.5
+  mean(n_wrong)
+}
+
+# call loss_func to compute the average number of wrong predictions in the (training) data
+loss_func(class = analysis$high_use, prob = analysis$probability)
+```
+
+Here we notice, that on average the model errs approximately in every fourth student. That is quite close to the amount (one third) of the students who actually have high alcohol consumption. Let us compare the resutls of the model to quessing that i) all male students have high consumption and female students low consumption of alcohol, and ii) there are no students with high use of alcohol.
+
+```{r}
+table(analysis$sex, analysis$high_use) %>% addmargins()
+```
+
+The model gives 106, the "males drink" quess `r 41 + 113`, and the "the students do not drink" quess 112 false answers out of 383 observations. Clearly, the model and the "the students do not drink" quess seem to be of similar accuracy.
+
