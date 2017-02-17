@@ -1,0 +1,196 @@
+---
+title: "Clustering and classification"
+author: "Markus Selin"
+date: "17 helmikuuta 2017"
+output: html_document
+---
+
+```{r, include=F}
+library(MASS)
+library(ggplot2)
+library(GGally)
+library(tidyr)
+library(corrplot)
+data(Boston)
+```
+
+## Clustering and classification
+
+This time we are going to use demonstrational "Boston"-dataset from MASS-library. The dataset has 506 observations on total of 14 variables, numeric and integral (below the  structure and the dimensions of the data are explored). Description of the dataset may be found [here](http://www.cs.toronto.edu/~delve/data/boston/bostonDetail.html) or [here](http://lib.stat.cmu.edu/datasets/boston). According to the links given, the set contains the following variables:
+
+*    *CRIM - per capita crime rate by town
+*    *ZN - proportion of residential land zoned for lots over 25,000 sq.ft.
+*    *INDUS - proportion of non-retail business acres per town.
+*    *CHAS - Charles River dummy variable (1 if tract bounds river; 0 otherwise)
+*    *NOX - nitric oxides concentration (parts per 10 million)
+*    *RM - average number of rooms per dwelling
+*    *AGE - proportion of owner-occupied units built prior to 1940
+*    *DIS - weighted distances to five Boston employment centres
+*    *RAD - index of accessibility to radial highways
+*    *TAX - full-value property-tax rate per $10,000
+*    *PTRATIO - pupil-teacher ratio by town
+*    *B(LACK) - 1000(Bk - 0.63)^2 where Bk is the proportion of blacks by town
+*    *LSTAT - % lower status of the population
+*    *MEDV - Median value of owner-occupied homes in $1000's
+
+```{r}
+str(Boston)
+dim(Boston)
+```
+
+The graphical overview of the data and the summaries of the variables found in the data are provided below. The pairvise scatter plots and histograms show that the variables with bell shaped (or nearly bell shaped) distribution are the average number of rooms per dwellign "rm" and the median value of owner-occupied homes in $1000's "medv". This can be further confirmed from the summary of the varibles - the 1st and 3rd quartiles in these variables are almost equally apart from the median. Interestingly, the "rm" and "medv" have positive correlation, and are negatively correlated with the % lower status of the population "lstat". The Charles River dummy variable "chas" has very little correlation with any other variables. The proportion of non-retail business acres per town "indus" and the nitric oxides concentration "nox" have quite strong positive correlation, and correlate with "age", "dis", "rad" and "tax". "Age" is the only one to have negative correlation with the other variables mentioned.
+
+```{r}
+p <- ggpairs(Boston, upper=NULL, lower = list(combo = wrap("facethist", bins = 20)))
+p
+```
+
+```{r}
+# calculate the correlation matrix and round it
+cor_matrix<-cor(Boston) 
+
+# print the correlation matrix
+cor_matrix <- cor_matrix %>% round(digits=2)
+
+# visualize the correlation matrix
+corrplot(cor_matrix, method="circle", type ="upper", cl.pos="b", tl.pos="d", tl.cex=0.6)
+```
+
+```{r}
+summary(Boston)
+```
+
+Below I have standardized the dataset. The mean of the variable is substracted from all the values, and the result is divided by the standard deviation of the variable. Also, I have used the code from DataCamp excercise to make a categorial crime variable from the scaled crime variable using the quantiles as break points. The new categorial variable "crime" will replace the numeric "crim" variable. I have also used the code from DataCamp to partition the observations into train-set (80 % of obs.) and test-set (the rest of the obs.) for use later parts of this excercise.
+
+```{r}
+boston_scaled <- scale(Boston)
+boston_scaled <- as.data.frame(boston_scaled)
+summary(boston_scaled)
+```
+
+```{r}
+# save the scaled crim as scaled_crim
+scaled_crim <- scale(boston_scaled$crim)
+
+# create a quantile vector of crim
+bins <- quantile(scaled_crim)
+
+# create a categorical variable 'crime'
+crime <- cut(scaled_crim, breaks = bins, include.lowest = TRUE, label=c("low","med_low","med_hig","high") )
+
+# remove original crim from the dataset
+boston_scaled <- dplyr::select(boston_scaled, -crim)
+
+# add the new categorical value to scaled data
+boston_scaled <- data.frame(boston_scaled, crime)
+
+# number of rows in the Boston dataset 
+n <- nrow(Boston)
+
+# choose randomly 80% of the rows
+ind <- sample(n,  size = n * 0.8)
+
+# create train set
+train <- boston_scaled[ind,]
+
+# create test set 
+test <- boston_scaled[-ind,]
+```
+
+Next, we will fit linear discriminant analysis on the train-set and plot the results (with arrow plot from http://stackoverflow.com/questions/17232251/how-can-i-plot-a-biplot-for-lda-in-r)
+
+```{r}
+# LDA fit on train-set
+lda.fit <- lda(crime ~ . , data = train)
+
+# arrow-function for the plotting
+lda.arrows <- function(x, myscale = 1, arrow_heads = 0.1, color = "red", tex = 0.75, choices = c(1,2)){
+  heads <- coef(x)
+  arrows(x0 = 0, y0 = 0, 
+         x1 = myscale * heads[,choices[1]], 
+         y1 = myscale * heads[,choices[2]], col=color, length = arrow_heads)
+  text(myscale * heads[,choices], labels = row.names(heads), 
+       cex = tex, col=color, pos=3)
+}
+
+# target classes as numeric (for arrow plot)
+classes <- as.numeric(train$crime)
+
+# plot the lda results
+plot(lda.fit, dimen = 2, col=classes, pch = classes)
+lda.arrows(lda.fit, myscale = 2)
+```
+
+Next, we will remove the crime variable from the test-set while keeping the values stored in another object. Then, we will use the LDA (model) to predict the category of crime to each observation in test-set. Lastly we will cross-tabulate the results vs. original categories. From the table (see below) it is easy to calculate that `r 4+2+5+7+2+4+2` of 102 observations are predicted wrong (`r round(26/102*100, digits=2)` % of the observations in test-set). The predictive power of this LDA (model) does not seem to be very good.
+
+```{r}
+# save the correct classes from test data
+correct_classes <- test$crime
+
+# remove the crime variable from test data
+test <- dplyr::select(test, -crime)
+
+# predict classes with test data
+lda.pred <- predict(lda.fit, newdata = test)
+
+# cross tabulate the results
+table(correct = correct_classes, predicted = lda.pred$class) %>% addmargins()
+```
+
+Let us reload the boston data-set, standardize it, fir a LDA model with total-within-sum-of-squares-optimized amount of clustering centers. The Let us analyze the pairvise scatterplots of the variables to see which of the pairs could help to separate the clusters. We can see the results inthe graphs below. 3 clusters are optimal. High accessibility to radial highways "rad" separates the areas with most crime. High proportion of residential land "zn" separates the areas with least crime.
+
+```{r}
+data("Boston")
+Boston <- scale(Boston)
+dist_eu <- dist(Boston)
+km <-kmeans(Boston, dist_eu, centers = 2)
+
+# determine the number of clusters
+k_max <- 10
+
+# calculate the total within sum of squares
+twcss <- sapply(1:k_max, function(k){kmeans(dist_eu, k)$tot.withinss})
+
+# visualize the results
+plot(1:k_max, twcss, type='b')
+
+km <-kmeans(Boston, dist_eu, centers = 3)
+
+```
+
+```{r}
+# plot the Boston dataset with clusters
+pairs(Boston, col = km$cluster)
+```
+
+Let us proceed to the bonus excercise. The idea is to cluster the scaled Boston data, and find the discriminating factors for the cluster using LDA. Acces to radial highways, nitric oxide concentration, and industrial environment are indicators of "bad neighbourhoods", and together with full value property tax rate (per 10 000 $) discriminate one of the clusters. Room number, median price of owner occupied houses and proportion of residential land show "good neighbourhoods" and make another cluster. Age is the only variable that discroiminates especially towarsds the last (remaining) cluster. Could it be that some age group (old/young) tends to live yet in a very different environment? Maybe older couples tend to move once their offspring leave the house?
+
+```{r}
+# initialtion: load, scale, compute distances and run km-clustring (2-clusters)
+data("Boston")
+Boston <- scale(Boston)
+Boston <- as.data.frame(Boston)
+dist_eu <- dist(Boston)
+km <-kmeans(Boston, dist_eu, centers = 3)
+
+# LDA
+lda.fit <- lda(km$cluster ~ . , data = Boston)
+
+# arrow-function for the plotting
+lda.arrows <- function(x, myscale = 1, arrow_heads = 0.1, color = "blue", tex = 0.75, choices = c(1,2)){
+  heads <- coef(x)
+  arrows(x0 = 0, y0 = 0, 
+         x1 = myscale * heads[,choices[1]], 
+         y1 = myscale * heads[,choices[2]], col=color, length = arrow_heads)
+  text(myscale * heads[,choices], labels = row.names(heads), 
+       cex = tex, col=color, pos=3)
+}
+
+# target classes as numeric (for arrow plot)
+classes <- as.numeric(km$cluster)
+
+# plot the lda results
+plot(lda.fit, dimen = 2, col=classes, pch = classes)
+lda.arrows(lda.fit, myscale = 3)
+```
+
