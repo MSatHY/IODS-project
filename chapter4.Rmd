@@ -14,7 +14,7 @@ library(corrplot)
 data(Boston)
 ```
 
-## Clustering and classification
+# Clustering and classification
 
 This time we are going to use demonstrational "Boston"-dataset from MASS-library. The dataset has 506 observations on total of 14 variables, numeric and integral (below the  structure and the dimensions of the data are explored). Description of the dataset may be found [here](http://www.cs.toronto.edu/~delve/data/boston/bostonDetail.html) or [here](http://lib.stat.cmu.edu/datasets/boston). According to the links given, the set contains the following variables:
 
