@@ -84,3 +84,53 @@ head(reading_test)
 glimpse(reading_test)
 dim(reading_test)
 
+
+# Continuation of the data wrangling (24.2.2017)
+
+library(stringr)
+
+# The excercise for this week produced the following urls:
+# original data page: http://hdr.undp.org/en/content/human-development-index-hdi
+# overview on developmental indices: http://hdr.undp.org/sites/default/files/hdr2015_technical_notes.pdf
+# See the meta file for the modified data (loaded below): https://raw.githubusercontent.com/TuomoNieminen/Helsinki-Open-Data-Science/master/datasets/human_meta.txt
+
+# Loading of the data modified in a harmonized way: 
+url <- "http://s3.amazonaws.com/assets.datacamp.com/production/course_2218/datasets/human1.txt"
+human <- read.table(url, sep = ",", header = T)
+
+# check structure
+str(human)
+
+# Remove the thousand separator (",") in the strings and store the result as numeric variable:
+human$GNI <- str_replace(human$GNI, pattern=",", replace ="") %>% as.numeric()
+
+# check structure
+str(human)
+
+# Keep only relevant variables
+keep_columns <- c("Country", "Edu2.FM", "Labo.FM", "Edu.Exp", "Life.Exp", "GNI", "Mat.Mor", "Ado.Birth", "Parli.F")
+human <- select(human, one_of(keep_columns))
+
+# Keep only "complete cases" i.e. rows (observations) without missing values:
+human <- filter(human, complete.cases(human)==TRUE)
+
+# Remove large geographical areas from the data
+tail(human, n=10)         # The 7 last observations are summary data from large geographical areas
+last <- nrow(human) - 7   # Last row to keep
+human <- human[1:last, ]  # Keep mentioned rows and all colummns
+tail(human, n=10)         # It went OK, since Niger was the last country and is now the last observation
+
+# Name the rows with countries and remove variable "Country"
+rownames(human) <- human$Country # Copy country names as row names
+human <- human[,2:ncol(human)]   # Remove country names column (the 1st column) from the data
+
+# Save the data:
+setwd("C:\\Users\\Markus\\Documents\\OpenDataScience\\IODS-project\\data")
+write.table(human, file="human.txt", append = F, quote = T, sep="\t", row.names = T)
+
+# Checking readability
+reading_test <- read.table("human.txt", sep="\t", header=T)
+str(reading_test)
+head(reading_test)
+glimpse(reading_test)
+dim(reading_test)
