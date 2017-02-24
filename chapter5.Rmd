@@ -1,0 +1,129 @@
+---
+title: "Dimensionality reduction techniques"
+author: "Markus Selin"
+date: "24 helmikuuta 2017"
+output: html_document
+---
+
+```{r, include=F, echo=F}
+library(GGally)
+library(corrplot)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+folder <- "C:\\Users\\Markus\\Documents\\OpenDataScience\\IODS-project\\data\\"
+file <- "human.txt"
+loadfile <- paste (folder, file, sep = "", collapse = NULL)
+human <- read.table(loadfile, sep="\t", header=T)
+```
+
+# Dimensionality reduction techniques
+
+The data originates from a open access [webpage](http://hdr.undp.org/en/content/human-development-index-hdi). The human developmental index (HDI) was created to access the developmental stage of countries using human reserves (skills etc.) rather than industrial output of the country as the measure of the developmental stage. There are also variants of this index available. Overview of the calculations for obtaining the indices may be found [here](http://hdr.undp.org/sites/default/files/hdr2015_technical_notes.pdf). 
+
+Briefly, the aspects covered by HDI are 
+
+* long and healthy life (life expectancy)
+* knowledge (through measured and expected years of education)
+* standard of living (GNI per capita)
+
+Gender equality index utilizes
+
+* Maternar mortality ratio
+* Adolescent birth rate
+* Secondary education % in males and females separately
+* % of females and males in labour market
+* Proportion (%) of parliaments seats taken by females
+
+Last week, we made modifications to the data. A meta file for the modified data is available [here](https://raw.githubusercontent.com/TuomoNieminen/Helsinki-Open-Data-Science/master/datasets/human_meta.txt). This week, we will utilize 8 variables from the modified data, i.e. ratio of proportions of population (the ratio of female % to male %) having secondary education ("Edu2.FM"") and rate of participation in labour force ("Labo.FM"), expected years of schooling ("Edu.Exp") and life ("Life.Exp"), gross national income ("GNI""), maternal mortality rate ("Mat.Mor"), adolescent birth rate ("Ado.Birth") and percent of parliament seats taken by females ("Parli.F"). Below the structure and the dimensions of the data are explored. The data now has 155 observations with data on all the 8 variables (observations with missing values were dropped out).
+
+```{r}
+str(human)
+dim(human)
+```
+
+Let us next check the distributions of variables and correlations in the data. We see from the histograms below, that many of the variables have roughly bell shaped disributions. The bell shape is not at all evident in GNI, maternal mortality and adolescent birth rate (the bell shapes in these varibales are visibly "cut" from the left side as they start to reach zero as the minimal value). The rough bell shape of life expectancy histogram is cut from the side of the maximal value (close to 85 years). All the variables correlate quite strongly with each other (positively or negatively) except "Parli.F" and "Labo.FM".
+```{r}
+summary (human)
+
+p <- ggpairs(human, upper=NULL, lower = list(combo = wrap("facethist", bins = 20)))
+p
+```
+
+```{r}
+# calculate the correlation matrix and round it
+cor_matrix <- cor(human)  %>% round(digits=2)
+
+# visualize the correlation matrix
+corrplot(cor_matrix, method="circle", type ="upper", cl.pos="b", tl.pos="d", tl.cex=0.6)
+
+# print the correlation matrix
+cor_matrix
+```
+
+Let us try principal component analysis without standardizing the data first, and let us visualise the results using a biplot. Then let us perform the same operation on standardized data. The results show how the variable with largest variance in the unstandardized data (GNI) will be weighed over all the other variables of the unstandardized data. The standardized data show much more proader distribution of the observations on the scatter plot with two prinsipal components describing the highest amount of variance. There, "Labor.FM" and "Parli.F" seem somewhat correlated with principal component no:2 and all the other components show positive and negative correlation with principal component no:1. This was to be expected from the correlations we saw earlier while inspecting the data. Here the arrow sizes are the same (due to standardization of the data). I take the result to mean, that educating all kids will also lead to females going towards secondary education and not having babies as young, and increase the life expectancy maybe at least partly due to reduced maternal mortality. 
+
+```{r}
+# PCA
+pca_human <- prcomp(human)
+
+# variability by the principal components
+s <- summary(pca_human)
+pca_pr <- round(1*s$importance[2, ]*100, digits = 1)
+pca_pr
+
+# biplot
+pc_lab <- paste0(names(pca_pr), " (", pca_pr, "%)")
+biplot(pca_human, cex = c(0.8, 1), col = c("grey40", "deeppink2"), xlab = pc_lab[1], ylab = pc_lab[2])
+
+```
+
+```{r}
+# PCA on scaled human
+human_scaled <- scale(human)
+pca_human_scaled <- prcomp(human_scaled)
+
+# variability by the principal components
+s <- summary(pca_human_scaled)
+pca_pr_scaled <- round(1*s$importance[2, ]*100, digits = 1)
+pca_pr_scaled
+
+# biplot
+pc_lab_scaled <- paste0(names(pca_pr_scaled), " (", pca_pr_scaled, "%)")
+biplot(pca_human_scaled, cex = c(0.8, 1), col = c("grey40", "deeppink2"), xlab = pc_lab_scaled[1], ylab = pc_lab_scaled[2])
+
+```
+
+Next: tea data exploration, multiple correspondency analysis on tea data, and graphical presentation of the results.
+
+```{r}
+library(FactoMineR)
+data(tea)
+
+# keep only part of data
+keep_columns <- c("Tea", "How", "how", "sugar", "where", "lunch")
+tea <- dplyr::select(tea, one_of(keep_columns))
+
+#Explore and vizualise the variables:
+str(tea)
+dim(tea)
+
+summary (tea)
+
+gather(tea) %>% ggplot(aes(value)) + facet_wrap("key", scales = "free") + geom_bar() + theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8))
+
+```
+
+
+
+```{r}
+# multiple correspondence analysis
+mca <- MCA(tea, graph = FALSE)
+
+# summary of the model
+summary(mca)
+
+# visualize MCA
+plot(mca, invisible=c("ind"), habillage = "quali")
+```
+
